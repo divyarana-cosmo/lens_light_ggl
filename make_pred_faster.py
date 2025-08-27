@@ -1,23 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_et(lra, ldec, sra, sdec, se1, se2):
-    lra  = lra*np.pi/180
-    ldec = ldec*np.pi/180
-    sra  = sra*np.pi/180
-    sdec = sdec*np.pi/180
-
-    c_theta = np.cos(ldec)*np.cos(sdec)*np.cos(lra - sra) + np.sin(ldec)*np.sin(sdec)
-    s_theta = np.sqrt(1-c_theta**2)
-
-    # phi to get the compute the tangential shear
-    c_phi   = np.cos(ldec)*np.sin(sra - lra)*1.0/s_theta
-    s_phi   = (-np.sin(ldec)*np.cos(sdec) + np.cos(ldec)*np.cos(sra - lra)*np.sin(sdec))*1.0/s_theta
-    # tangential shear
-    e_t     = - se1*(2*c_phi**2 -1) - se2*(2*c_phi * s_phi)
-
-    return e_t
-
 class galprofile():
     def bm(self, m):
         "using eq 25 from ciotti and bertin 1999"
@@ -75,8 +58,8 @@ class lenslight(galprofile):
         q11 = np.trapz(np.trapz(x_diff**2 * zz_norm, axis=1), dx=self.dy) * self.dx
         q22 = np.trapz(np.trapz(y_diff**2 * zz_norm, axis=1), dx=self.dy) * self.dx
         q12 = np.trapz(np.trapz(x_diff * y_diff * zz_norm, axis=1), dx=self.dy) * self.dx
-
-        q_sum = q11 + q22
+        # we use epsilon for the decision
+        q_sum = q11 + q22 + 2*(q11*q22 - q12**2)**0.5
         e1 = (q11 - q22) / q_sum
         e2 = 2 * q12 / q_sum
 
@@ -94,15 +77,16 @@ if __name__ == "__main__":
     zz_src = ll.psrc(ll.x_grid, ll.y_grid)
     total_src = np.trapz(np.trapz(zz_src, axis=1), dx=ll.dy) * ll.dx
 
-    xx_vals = np.logspace(1, 3, 100)
-    ii_vals = [5, 10, 20]
+    xx_vals = np.logspace(-1, 2, 100)
+    ii_vals = np.arange(1,6)
+    lRe = 3+1
 
     for cnt, ii in enumerate(ii_vals):
         e1_vals = []
         e2_vals = []
 
         for xx in xx_vals:
-            ll.lens_profile(I0=ii, Re=3, m=4, x0=xx, y0=0.0)
+            ll.lens_profile(I0=ii, Re=lRe, m=4, x0=xx, y0=0.0)
             e1, e2 = ll.ell()
             e1_vals.append(-e1)
             e2_vals.append(e2)
@@ -110,6 +94,15 @@ if __name__ == "__main__":
         ax1.plot(xx_vals, e1_vals, '.', c='C%d' % cnt)
         ax2.plot(xx_vals, e2_vals, '.', c='C%d' % cnt)
 
+    ax1.axvline(lRe, ls='-', color='black')
     ax1.set_xscale('log')
-    ax2.set_xscale('log')
+    ax1.set_xlabel(r'$R_{\rm ls}$ [pix]')
+    ax1.set_ylabel(r'$e_t$')
 
+    ax2.set_xscale('log')
+    ax2.set_xlabel(r'$R_{\rm ls}$ [pix]')
+    ax2.set_ylabel(r'$e_\times$')
+
+
+    plt.tight_layout()
+    plt.savefig('test.png', dpi=300)
